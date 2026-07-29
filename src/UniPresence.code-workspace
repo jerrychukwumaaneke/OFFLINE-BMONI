@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "../../UniPresence"
+		},
+		{
+			"name": "bmoni-agent-relay",
+			"path": ".."
+		}
+	],
+	"settings": {}
+}
