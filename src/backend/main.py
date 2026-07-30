@@ -183,7 +183,7 @@ def post_register(
         
         # 4. Generate Session Token and redirect to password reset
         token = create_session()
-        response.set_cookie(key="session_token", value=token, httponly=True, samesite="lax")
+        response.set_cookie(key="session_token", value=token, httponly=True, samesite="none", secure=True)
         return {"message": "Success"}
         
     except Exception as e:
@@ -230,7 +230,7 @@ def post_login(response: Response, email: str = Form(...), password: str = Form(
         
     # Generate token
     token = create_session()
-    response.set_cookie(key="session_token", value=token, httponly=True, samesite="lax")
+    response.set_cookie(key="session_token", value=token, httponly=True, samesite="none", secure=True)
     return {"message": "Success"}
 
 # Forgot Password Pages
