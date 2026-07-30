@@ -98,6 +98,21 @@ def get_registration_status():
     registered_user = get_profile_value("bmoni_user_id")
     return {"registered": registered_user is not None and len(registered_user) > 0}
 
+@app.get("/api/reset-db-unprotected")
+def force_reset_database_route():
+    """Wipes the database and resets to initial defaults (unprotected for emergency staging reset)."""
+    import sqlite3
+    conn = sqlite3.connect("offline_relay.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM transactions")
+    cursor.execute("DELETE FROM sqlite_sequence WHERE name='transactions'")
+    cursor.execute("DELETE FROM agent_profile")
+    cursor.execute("INSERT OR REPLACE INTO agent_profile (key, value) VALUES ('password_hash', ?)", (hash_password("BMONI_TEMP_2026"),))
+    cursor.execute("INSERT OR REPLACE INTO agent_profile (key, value) VALUES ('is_default_password', 'True')")
+    conn.commit()
+    conn.close()
+    return {"status": "Database Reset Successful", "message": "The database has been wiped. You can now register a fresh profile."}
+
 # Registration page
 @app.get("/register")
 def get_register_page():
