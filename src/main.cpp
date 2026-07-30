@@ -76,6 +76,7 @@ void handleRoot() {
 
 // Handler for Web Payment Form Submission
 void handlePay() {
+    Serial.println("DEBUG: /pay POST route triggered");
     if (server.hasArg("sender") && server.hasArg("receiver") && server.hasArg("amount")) {
         String sender = server.arg("sender");
         String receiver = server.arg("receiver");
@@ -83,11 +84,27 @@ void handlePay() {
 
         send_payload(sender, receiver, amount);
         
-        // Redirect back to main page to display refreshed payload
         server.sendHeader("Location", "/");
         server.send(303);
     } else {
         server.send(400, "text/plain", "Bad Request: Missing parameters");
+    }
+}
+
+// GET Fallback: Authorize payment directly via URL query parameters
+// Example: http://192.168.4.1/pay-get?sender=08012345678&receiver=09087654321&amount=1500
+void handlePayGet() {
+    Serial.println("DEBUG: /pay-get GET route triggered");
+    if (server.hasArg("sender") && server.hasArg("receiver") && server.hasArg("amount")) {
+        String sender = server.arg("sender");
+        String receiver = server.arg("receiver");
+        double amount = server.arg("amount").toDouble();
+
+        send_payload(sender, receiver, amount);
+        
+        server.send(200, "text/plain", "Payment Logged! Check your local dashboard.");
+    } else {
+        server.send(400, "text/plain", "Missing query parameters: sender, receiver, amount");
     }
 }
 
@@ -103,6 +120,7 @@ void setup() {
 
     server.on("/", handleRoot);
     server.on("/pay", HTTP_POST, handlePay);
+    server.on("/pay-get", HTTP_GET, handlePayGet);
     server.begin();
 
     delay(1000);
