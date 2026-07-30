@@ -181,10 +181,6 @@ def post_register(
 @app.get("/login")
 def get_login_page(session_token: str = Cookie(None)):
     """Serves the login page."""
-    # Ensure they are registered first
-    if not get_profile_value("bmoni_user_id"):
-        return RedirectResponse(url="/register", status_code=303)
-        
     if session_token and verify_session(session_token):
         return RedirectResponse(url="/dashboard", status_code=303)
         
