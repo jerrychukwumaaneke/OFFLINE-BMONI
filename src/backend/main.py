@@ -181,6 +181,10 @@ def post_register(
 @app.get("/login")
 def get_login_page(session_token: str = Cookie(None)):
     """Serves the login page."""
+    # If the node is not registered yet, redirect to configuration/registration
+    if not get_profile_value("bmoni_user_id"):
+        return RedirectResponse(url="/register", status_code=303)
+        
     if session_token and verify_session(session_token):
         return RedirectResponse(url="/dashboard", status_code=303)
         
@@ -212,6 +216,35 @@ def post_login(response: Response, email: str = Form(...), password: str = Form(
     token = create_session()
     response.set_cookie(key="session_token", value=token, httponly=True, samesite="lax")
     return {"message": "Success"}
+
+# Forgot Password Pages
+@app.get("/forgot-password")
+def get_forgot_password():
+    """Serves the forgot password recovery page."""
+    html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "forgot_password.html")
+    if os.path.exists(html_path):
+        return FileResponse(html_path)
+    return HTMLResponse("<h1>forgot_password.html Not Found</h1>")
+
+@app.post("/forgot-password")
+def post_forgot_password(email: str = Form(...), recovery_password: str = Form(...), new_password: str = Form(...)):
+    """Resets the password if authorized by email and default recovery password."""
+    # Check registration
+    if not get_profile_value("bmoni_user_id"):
+        raise HTTPException(status_code=400, detail="Agent is not registered yet.")
+        
+    # Verify Email
+    saved_email = get_profile_value("email")
+    if email.lower() != saved_email.lower():
+        raise HTTPException(status_code=400, detail="Email address does not match registered agent.")
+        
+    # Verify staff recovery password (default BMONI_TEMP_2026)
+    if recovery_password != "BMONI_TEMP_2026":
+        raise HTTPException(status_code=400, detail="Invalid staff default recovery password.")
+        
+    # Apply new password reset
+    set_profile_value("password_hash", hash_password(new_password))
+    return {"message": "Password reset successfully!"}
 
 @app.get("/change-password")
 def get_change_password_page(session_token: str = Cookie(None)):
