@@ -153,15 +153,15 @@ def post_register(
         wallet_address = wallet_data.get("walletAddress") or wallet_data.get("address")
         wallet_id = wallet_data.get("id") or wallet_data.get("smartWalletId")
         
-        # D. Sandbox NGN KYC
-        start_nigeria_onboarding(user_id, wallet_address)
-        
-        # E. Provision NGN VBA
-        if wallet_id:
-            try:
+        # D. Sandbox NGN KYC & Rail Onboarding (wrapped to bypass staging latency/failures)
+        try:
+            start_nigeria_onboarding(user_id, wallet_address)
+            
+            # E. Provision NGN VBA
+            if wallet_id:
                 provision_nigerian_vba(user_id, wallet_id)
-            except Exception:
-                pass
+        except Exception as kyc_err:
+            print(f"[REGISTRATION WARNING] Sandbox KYC/VBA activation failed or timed out: {kyc_err}")
                 
         print(f"[REGISTRATION] Successfully onboarded BMONI User: {user_id}")
         
@@ -171,11 +171,11 @@ def post_register(
         return {"message": "Success"}
         
     except Exception as e:
-        print(f"[REGISTRATION ERROR] Onboarding failed: {e}")
+        print(f"[REGISTRATION ERROR] User/Wallet creation failed: {e}")
         # Clear profile keys on fail so they can try again
         set_profile_value("bmoni_user_id", "")
         set_profile_value("smart_wallet_address", "")
-        raise HTTPException(status_code=500, detail=f"BMONI Onboarding failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"BMONI User/Wallet creation failed: {str(e)}")
 
 # Login Page
 @app.get("/login")
