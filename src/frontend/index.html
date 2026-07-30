@@ -480,6 +480,10 @@
         async function fetchStatus() {
             try {
                 const res = await fetch(`${API_URL}/api/status`, { credentials: 'include' });
+                if (res.status === 401) {
+                    window.location.href = "/login";
+                    return;
+                }
                 const data = await res.json();
                 
                 document.getElementById("wallet-address").textContent = data.smart_wallet_address || "Onboarding Wallet...";
@@ -512,6 +516,10 @@
         async function fetchPendingQueue() {
             try {
                 const res = await fetch(`${API_URL}/transactions/pending`, { credentials: 'include' });
+                if (res.status === 401) {
+                    window.location.href = "/login";
+                    return;
+                }
                 const data = await res.json();
                 
                 document.getElementById("queue-count").textContent = `${data.pending_count} Pending`;

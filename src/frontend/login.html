@@ -178,6 +178,19 @@
                 errorBox.style.display = "block";
             }
         }
+        async function checkRegistration() {
+            const API_URL = window.location.hostname.includes("vercel.app") ? "https://offline-bmoni.onrender.com" : "";
+            try {
+                const res = await fetch(`${API_URL}/api/status-unprotected`);
+                const data = await res.json();
+                if (!data.registered) {
+                    window.location.href = "/register";
+                }
+            } catch (err) {
+                console.error("Error checking registration:", err);
+            }
+        }
+        checkRegistration();
     </script>
 </body>
 </html>
