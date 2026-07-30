@@ -488,7 +488,7 @@
         // Poll API status every 3 seconds
         async function fetchStatus() {
             try {
-                const res = await fetch(`${API_URL}/api/status`);
+                const res = await fetch(`${API_URL}/api/status`, { credentials: 'include' });
                 const data = await res.json();
                 
                 document.getElementById("wallet-address").textContent = data.smart_wallet_address || "Onboarding Wallet...";
@@ -520,7 +520,7 @@
         // Fetch pending transactions
         async function fetchPendingQueue() {
             try {
-                const res = await fetch(`${API_URL}/transactions/pending`);
+                const res = await fetch(`${API_URL}/transactions/pending`, { credentials: 'include' });
                 const data = await res.json();
                 
                 document.getElementById("queue-count").textContent = `${data.pending_count} Pending`;
@@ -548,7 +548,7 @@
         // Trigger transaction sync
         async function syncTransactions() {
             try {
-                const res = await fetch(`${API_URL}/transactions/sync`, { method: "POST" });
+                const res = await fetch(`${API_URL}/transactions/sync`, { method: "POST", credentials: 'include' });
                 const data = await res.json();
                 alert(data.message);
                 fetchPendingQueue();
@@ -561,7 +561,7 @@
         // Simulate offline event
         async function simulateHardwareEvent() {
             try {
-                const res = await fetch(`${API_URL}/transactions/simulate`, { method: "POST" });
+                const res = await fetch(`${API_URL}/transactions/simulate`, { method: "POST", credentials: 'include' });
                 const data = await res.json();
                 fetchPendingQueue();
             } catch (err) {
@@ -591,7 +591,8 @@
                 const res = await fetch(`${API_URL}/ai/chat`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message })
+                    body: JSON.stringify({ message }),
+                    credentials: 'include'
                 });
                 const data = await res.json();
                 document.getElementById("ai-loading").remove();

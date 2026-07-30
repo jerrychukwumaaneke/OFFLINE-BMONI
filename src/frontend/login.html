@@ -162,7 +162,8 @@
                 const res = await fetch(`${API_URL}/login`, {
                     method: "POST",
                     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                    body: new URLSearchParams({ email, password })
+                    body: new URLSearchParams({ email, password }),
+                    credentials: 'include'
                 });
                 
                 if (res.ok) {

@@ -34,7 +34,12 @@ app = FastAPI(title="BMONI Offline Agent Relay Node")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Restrict to specific origins in production
+    allow_origins=[
+        "https://offline-bmoni.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
