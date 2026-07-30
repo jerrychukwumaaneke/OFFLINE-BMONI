@@ -6,7 +6,7 @@ import json
 # Change COM3 to match your ESP32 COM port in Device Manager
 SERIAL_PORT = "COM5"  
 BAUD_RATE = 115200
-FASTAPI_ENDPOINT = "http://127.0.0.1:8000/transaction/offline-receive"
+FASTAPI_ENDPOINT = "https://offline-bmoni.onrender.com/transaction/offline-receive"
 
 def listen_to_esp32():
     print(f"Connecting to ESP32 on {SERIAL_PORT} at {BAUD_RATE} baud...")
