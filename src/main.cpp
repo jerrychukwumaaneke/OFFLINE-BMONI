@@ -4,7 +4,6 @@
 #include <ArduinoJson.h>
 
 #define ONBOARD_LED 8
-#define BOOT_BUTTON 9
 
 const char *ssid = "BMONI_OFFLINE_NODE";
 const char *password = "bmoni1234";
@@ -12,7 +11,6 @@ const char *password = "bmoni1234";
 WebServer server(80);
 
 String lastTransactionPayload = "No transaction recorded yet.";
-bool buttonPressed = false;
 
 // Helper function to send transaction payload over Serial
 void send_payload(String sender, String receiver, double amount) {
@@ -57,9 +55,9 @@ void handleRoot() {
     // Input Form for Custom Payments
     html += "<div class='card'><h3>New Escrow Payment</h3>";
     html += "<form action='/pay' method='POST'>";
-    html += "<label>Sender Wallet:</label><br>";
+    html += "<label>Sender Wallet (Phone):</label><br>";
     html += "<input type='text' name='sender' value='08012345678' required><br>";
-    html += "<label>Receiver Wallet:</label><br>";
+    html += "<label>Receiver Wallet (Phone):</label><br>";
     html += "<input type='text' name='receiver' value='09087654321' required><br>";
     html += "<label>Amount (NGN):</label><br>";
     html += "<input type='number' step='0.01' name='amount' value='1000.00' required><br>";
@@ -112,7 +110,6 @@ void setup() {
     Serial.begin(115200);
 
     pinMode(ONBOARD_LED, OUTPUT);
-    pinMode(BOOT_BUTTON, INPUT_PULLUP);
     digitalWrite(ONBOARD_LED, HIGH); // Active LOW: HIGH = OFF
 
     // Set up ESP32 Access Point
@@ -127,20 +124,9 @@ void setup() {
     Serial.println("==============================================");
     Serial.println(" BMONI MOBILE TERMINAL READY                 ");
     Serial.println(" AP: BMONI_OFFLINE_NODE (192.168.4.1)        ");
-    Serial.println(" BOOT Button fallback active                 ");
     Serial.println("==============================================");
 }
 
 void loop() {
     server.handleClient();
-
-    // Physical BOOT Button fallback ($5,000 quick payment)
-    if (digitalRead(BOOT_BUTTON) == LOW && !buttonPressed) {
-        buttonPressed = true;
-        send_payload("08012345678", "09087654321", 5000.00);
-        delay(500);
-    } 
-    else if (digitalRead(BOOT_BUTTON) == HIGH) {
-        buttonPressed = false;
-    }
 }

@@ -141,6 +141,7 @@
             <div class="input-group">
                 <label for="password">Password</label>
                 <input type="password" id="password" required placeholder="••••••••">
+                <a href="/forgot-password" style="display: block; text-align: right; font-size: 0.85rem; color: var(--text-muted); text-decoration: none; margin-top: 0.5rem; transition: color 0.2s ease;" onmouseover="this.style.color='#00f2fe'" onmouseout="this.style.color='#94a3b8'">Forgot Password?</a>
             </div>
             
             <button type="submit" class="btn-submit">Authenticate</button>
@@ -156,8 +157,9 @@
             
             errorBox.style.display = "none";
             
+            const API_URL = window.location.hostname.includes("vercel.app") ? "https://offline-bmoni.onrender.com" : "";
             try {
-                const res = await fetch("/login", {
+                const res = await fetch(`${API_URL}/login`, {
                     method: "POST",
                     headers: { "Content-Type": "application/x-www-form-urlencoded" },
                     body: new URLSearchParams({ email, password })
