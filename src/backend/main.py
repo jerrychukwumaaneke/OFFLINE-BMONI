@@ -116,11 +116,7 @@ def force_reset_database_route():
 # Registration page
 @app.get("/register")
 def get_register_page():
-    """Serves the registration page (only if no user is registered)."""
-    registered_user = get_profile_value("bmoni_user_id")
-    if registered_user:
-        return RedirectResponse(url="/login", status_code=303)
-        
+    """Serves the registration page."""
     html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "register.html")
     if os.path.exists(html_path):
         return FileResponse(html_path)
