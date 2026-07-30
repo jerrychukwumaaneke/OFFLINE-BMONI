@@ -28,7 +28,17 @@ from bmoni_client import (
 import wallet
 from ai_agent import get_ai_response
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="BMONI Offline Agent Relay Node")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Restrict to specific origins in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 def startup_event():
@@ -72,7 +82,7 @@ def check_dashboard_auth_redirect(session_token: str) -> RedirectResponse | None
 @app.get("/")
 def serve_landing_page():
     """Serves the welcome landing page."""
-    html_path = os.path.join(os.path.dirname(__file__), "landing.html")
+    html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "landing.html")
     if os.path.exists(html_path):
         return FileResponse(html_path)
     return HTMLResponse("<h1>landing.html Not Found</h1>")
@@ -91,7 +101,7 @@ def get_register_page():
     if registered_user:
         return RedirectResponse(url="/login", status_code=303)
         
-    html_path = os.path.join(os.path.dirname(__file__), "register.html")
+    html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "register.html")
     if os.path.exists(html_path):
         return FileResponse(html_path)
     return HTMLResponse("<h1>register.html Not Found</h1>")
@@ -178,7 +188,7 @@ def get_login_page(session_token: str = Cookie(None)):
     if session_token and verify_session(session_token):
         return RedirectResponse(url="/dashboard", status_code=303)
         
-    html_path = os.path.join(os.path.dirname(__file__), "login.html")
+    html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "login.html")
     if os.path.exists(html_path):
         return FileResponse(html_path)
     return HTMLResponse("<h1>login.html Not Found</h1>")
@@ -213,7 +223,7 @@ def get_change_password_page(session_token: str = Cookie(None)):
     if not session_token or not verify_session(session_token):
         return RedirectResponse(url="/login", status_code=303)
         
-    html_path = os.path.join(os.path.dirname(__file__), "change_password.html")
+    html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "change_password.html")
     if os.path.exists(html_path):
         return FileResponse(html_path)
     return HTMLResponse("<h1>change_password.html Not Found</h1>")
@@ -246,7 +256,7 @@ def serve_dashboard(session_token: str = Cookie(None)):
     if redirect:
         return redirect
         
-    html_path = os.path.join(os.path.dirname(__file__), "index.html")
+    html_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend", "index.html")
     if os.path.exists(html_path):
         return FileResponse(html_path)
     return HTMLResponse("<h1>index.html Not Found</h1>")
