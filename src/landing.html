@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to BMONI Agent Relay</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(22, 33, 54, 0.4);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --primary: #00f2fe;
+            --secondary: #4facfe;
+            --text-color: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at 50% 0%, #1e1b4b, var(--bg-color));
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+        }
+
+        .welcome-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 4rem 3rem;
+            width: 100%;
+            max-width: 540px;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+
+        .logo-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1.5rem;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 0.8rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.description {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            line-height: 1.5;
+            margin-bottom: 3rem;
+        }
+
+        .action-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+        }
+
+        .btn-action {
+            display: block;
+            width: 100%;
+            padding: 1.2rem;
+            border-radius: 14px;
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 1.05rem;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .btn-register {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: #040814;
+            box-shadow: 0 4px 20px rgba(0, 242, 254, 0.25);
+        }
+
+        .btn-register:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 242, 254, 0.45);
+        }
+
+        .btn-login {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--card-border);
+            color: var(--text-color);
+        }
+
+        .btn-login:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-3px);
+            border-color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="welcome-card">
+        <div class="logo-icon">⚡</div>
+        <h1>BMONI Agent Relay</h1>
+        <p class="description">
+            Secure offline escrow transaction logging node. Connect your terminals, log payments offline, and settle live on the CNGN blockchain.
+        </p>
+
+        <div class="action-container">
+            <a href="/register" class="btn-action btn-register">Register Agent Node</a>
+            <a href="/login" class="btn-action btn-login">Sign In to Dashboard</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,7 +1,12 @@
 import sqlite3
-import os
+import hashlib
+import secrets
 
 DB_NAME = "offline_relay.db"
+
+def hash_password(password: str) -> str:
+    """Helper to hash user passwords using SHA256."""
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 def init_db():
     """Creates the local escrow database table and settings table if they don't exist."""
@@ -31,7 +36,33 @@ def init_db():
     
     conn.commit()
     conn.close()
+    
+    # Set default credentials if not already initialized
+    if not get_profile_value("password_hash"):
+        print("[DB] Initializing default password to 'BMONI_TEMP_2026'...")
+        set_profile_value("password_hash", hash_password("BMONI_TEMP_2026"))
+        set_profile_value("is_default_password", "True")
+        
     print("Local Escrow SQLite DB Initialized successfully.")
+
+def create_session() -> str:
+    """Generates a secure random session token and saves it."""
+    token = secrets.token_hex(32)
+    set_profile_value("session_token", token)
+    return token
+
+def verify_session(token: str) -> bool:
+    """Verifies that the provided token matches the active session."""
+    saved_token = get_profile_value("session_token")
+    return saved_token is not None and token == saved_token
+
+def destroy_session():
+    """Deletes the active session token."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM agent_profile WHERE key = 'session_token'")
+    conn.commit()
+    conn.close()
 
 def insert_transaction(node_id, sender, receiver, amount):
     """Saves a new offline transaction payload locally."""

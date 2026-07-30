@@ -1,15 +1,18 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi import FastAPI, HTTPException, Cookie, Depends, Response, Form
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from pydantic import BaseModel
 import os
-import threading
 from database import (
     init_db, 
     insert_transaction, 
     get_pending_transactions, 
     mark_as_synced, 
     get_profile_value,
-    set_profile_value
+    set_profile_value,
+    hash_password,
+    create_session,
+    verify_session,
+    destroy_session
 )
 from bmoni_client import (
     create_bmoni_user, 
@@ -27,77 +30,9 @@ from ai_agent import get_ai_response
 
 app = FastAPI(title="BMONI Offline Agent Relay Node")
 
-# Background thread to handle automatic BMONI Sandbox onboarding on startup
-def auto_onboard_agent():
-    print("[ONBOARDING] Starting auto-onboarding task...")
-    try:
-        init_db()
-        
-        # 1. EVM Owner Wallet
-        pk, addr = wallet.get_or_create_keypair()
-        print(f"[ONBOARDING] EVM Owner Address: {addr}")
-        
-        # 2. BMONI User ID
-        user_id = get_profile_value("bmoni_user_id")
-        if not user_id:
-            user_id = create_bmoni_user()
-            print(f"[ONBOARDING] Created BMONI User ID: {user_id}")
-        else:
-            print(f"[ONBOARDING] Found BMONI User ID: {user_id}")
-            
-        # 3. Smart Wallet Address
-        wallet_address = get_profile_value("smart_wallet_address")
-        if not wallet_address:
-            try:
-                challenge = get_challenge(user_id, addr)
-                challenge_id = challenge["challengeId"]
-                msg = challenge["message"]
-                sig = wallet.sign_eip191_message(msg, pk)
-                wallet_data = create_managed_wallet(user_id, addr, challenge_id, sig)
-                wallet_address = wallet_data.get("walletAddress") or wallet_data.get("address")
-                print(f"[ONBOARDING] Deployed Smart Wallet: {wallet_address}")
-            except Exception as e:
-                print(f"[ONBOARDING] Managed wallet creation failed, recovering: {e}")
-                wallets = get_smart_wallets(user_id)
-                if wallets:
-                    wallet_data = wallets[0]
-                    wallet_address = wallet_data.get("walletAddress")
-                    wallet_id = wallet_data.get("id")
-                    if wallet_address:
-                        set_profile_value("smart_wallet_address", wallet_address)
-                    if wallet_id:
-                        set_profile_value("smart_wallet_id", wallet_id)
-                    print(f"[ONBOARDING] Recovered Smart Wallet: {wallet_address}")
-                else:
-                    raise e
-        else:
-            print(f"[ONBOARDING] Found Smart Wallet Address: {wallet_address}")
-            
-        # 4. Sandbox KYC and Nigeria rail onboarding
-        try:
-            start_nigeria_onboarding(user_id, wallet_address)
-            print("[ONBOARDING] Submitting NGN KYC...")
-        except Exception as e:
-            # If already active, it will throw conflict but we can proceed
-            print(f"[ONBOARDING] NGN KYC Onboarding check: {e}")
-            
-        # 5. Provision Virtual NGN Bank Account for deposits
-        wallet_id = get_profile_value("smart_wallet_id")
-        if wallet_id:
-            try:
-                provision_nigerian_vba(user_id, wallet_id)
-            except Exception as e:
-                print(f"[ONBOARDING] VBA provisioning check: {e}")
-                
-        print("[ONBOARDING] Auto-onboarding complete! Node is live and configured.")
-    except Exception as e:
-        print(f"[ONBOARDING] Auto-onboarding failed: {e}")
-
 @app.on_event("startup")
 def startup_event():
     init_db()
-    # Run onboarding in a background thread so FastAPI startup isn't blocked by network requests
-    threading.Thread(target=auto_onboard_agent, daemon=True).start()
 
 # Data models
 class TransactionSchema(BaseModel):
@@ -109,20 +44,224 @@ class TransactionSchema(BaseModel):
 class ChatMessageSchema(BaseModel):
     message: str
 
+# API protection dependency
+def verify_api_auth(session_token: str = Cookie(None)):
+    if not session_token or not verify_session(session_token):
+        raise HTTPException(status_code=401, detail="Unauthorized session. Please log in.")
+    return session_token
+
+# Helper to verify HTML routes status for dashboard access
+def check_dashboard_auth_redirect(session_token: str) -> RedirectResponse | None:
+    # 1. Verify if registered
+    registered_user = get_profile_value("bmoni_user_id")
+    if not registered_user:
+        return RedirectResponse(url="/register", status_code=303)
+        
+    # 2. Verify session
+    if not session_token or not verify_session(session_token):
+        return RedirectResponse(url="/login", status_code=303)
+    
+    # 3. Check if default password needs changing
+    is_default = get_profile_value("is_default_password")
+    if is_default == "True":
+        return RedirectResponse(url="/change-password", status_code=303)
+        
+    return None
+
+# Welcome / Landing Page
 @app.get("/")
-def serve_dashboard():
-    """Serves the dashboard HTML file."""
+def serve_landing_page():
+    """Serves the welcome landing page."""
+    html_path = os.path.join(os.path.dirname(__file__), "landing.html")
+    if os.path.exists(html_path):
+        return FileResponse(html_path)
+    return HTMLResponse("<h1>landing.html Not Found</h1>")
+
+@app.get("/api/status-unprotected")
+def get_registration_status():
+    """Unprotected endpoint to check if the node has been configured yet."""
+    registered_user = get_profile_value("bmoni_user_id")
+    return {"registered": registered_user is not None and len(registered_user) > 0}
+
+# Registration page
+@app.get("/register")
+def get_register_page():
+    """Serves the registration page (only if no user is registered)."""
+    registered_user = get_profile_value("bmoni_user_id")
+    if registered_user:
+        return RedirectResponse(url="/login", status_code=303)
+        
+    html_path = os.path.join(os.path.dirname(__file__), "register.html")
+    if os.path.exists(html_path):
+        return FileResponse(html_path)
+    return HTMLResponse("<h1>register.html Not Found</h1>")
+
+@app.post("/register")
+def post_register(
+    response: Response,
+    first_name: str = Form(...),
+    last_name: str = Form(...),
+    email: str = Form(...),
+    phone: str = Form(...),
+    default_password: str = Form(...)
+):
+    """Handles first-time registration and BMONI Sandbox onboarding."""
+    # 1. Verify that a user is not already onboarded
+    if get_profile_value("bmoni_user_id"):
+        raise HTTPException(status_code=400, detail="Node is already registered.")
+        
+    # 2. Verify temporary authorization password
+    entered_hash = hash_password(default_password)
+    correct_hash = get_profile_value("password_hash")
+    
+    if entered_hash != correct_hash:
+        raise HTTPException(status_code=400, detail="Invalid temporary authorization password.")
+        
+    print(f"[REGISTRATION] Onboarding profile: {first_name} {last_name} ({email})")
+    
+    try:
+        # Save profile details locally first
+        set_profile_value("first_name", first_name)
+        set_profile_value("last_name", last_name)
+        set_profile_value("email", email)
+        set_profile_value("phone", phone)
+        
+        # 3. Run Live BMONI Handshake
+        # A. EVM keypair
+        pk, addr = wallet.get_or_create_keypair()
+        
+        # B. BMONI User
+        user_id = create_bmoni_user(first_name=first_name, email=email, phone=phone)
+        
+        # C. BMONI Smart Wallet
+        challenge = get_challenge(user_id, addr)
+        challenge_id = challenge["challengeId"]
+        msg = challenge["message"]
+        sig = wallet.sign_eip191_message(msg, pk)
+        
+        wallet_data = create_managed_wallet(user_id, addr, challenge_id, sig)
+        wallet_address = wallet_data.get("walletAddress") or wallet_data.get("address")
+        wallet_id = wallet_data.get("id") or wallet_data.get("smartWalletId")
+        
+        # D. Sandbox NGN KYC
+        start_nigeria_onboarding(user_id, wallet_address)
+        
+        # E. Provision NGN VBA
+        if wallet_id:
+            try:
+                provision_nigerian_vba(user_id, wallet_id)
+            except Exception:
+                pass
+                
+        print(f"[REGISTRATION] Successfully onboarded BMONI User: {user_id}")
+        
+        # 4. Generate Session Token and redirect to password reset
+        token = create_session()
+        response.set_cookie(key="session_token", value=token, httponly=True, samesite="lax")
+        return {"message": "Success"}
+        
+    except Exception as e:
+        print(f"[REGISTRATION ERROR] Onboarding failed: {e}")
+        # Clear profile keys on fail so they can try again
+        set_profile_value("bmoni_user_id", "")
+        set_profile_value("smart_wallet_address", "")
+        raise HTTPException(status_code=500, detail=f"BMONI Onboarding failed: {str(e)}")
+
+# Login Page
+@app.get("/login")
+def get_login_page(session_token: str = Cookie(None)):
+    """Serves the login page."""
+    # Ensure they are registered first
+    if not get_profile_value("bmoni_user_id"):
+        return RedirectResponse(url="/register", status_code=303)
+        
+    if session_token and verify_session(session_token):
+        return RedirectResponse(url="/dashboard", status_code=303)
+        
+    html_path = os.path.join(os.path.dirname(__file__), "login.html")
+    if os.path.exists(html_path):
+        return FileResponse(html_path)
+    return HTMLResponse("<h1>login.html Not Found</h1>")
+
+@app.post("/login")
+def post_login(response: Response, email: str = Form(...), password: str = Form(...)):
+    """Authenticates the agent using email and password."""
+    # Check registration
+    if not get_profile_value("bmoni_user_id"):
+        raise HTTPException(status_code=400, detail="Agent is not registered yet.")
+        
+    # Verify Email
+    saved_email = get_profile_value("email")
+    if email.lower() != saved_email.lower():
+        raise HTTPException(status_code=400, detail="Invalid email or password.")
+        
+    # Verify Password
+    entered_hash = hash_password(password)
+    correct_hash = get_profile_value("password_hash")
+    
+    if entered_hash != correct_hash:
+        raise HTTPException(status_code=400, detail="Invalid email or password.")
+        
+    # Generate token
+    token = create_session()
+    response.set_cookie(key="session_token", value=token, httponly=True, samesite="lax")
+    return {"message": "Success"}
+
+@app.get("/change-password")
+def get_change_password_page(session_token: str = Cookie(None)):
+    """Serves the password update screen."""
+    if not session_token or not verify_session(session_token):
+        return RedirectResponse(url="/login", status_code=303)
+        
+    html_path = os.path.join(os.path.dirname(__file__), "change_password.html")
+    if os.path.exists(html_path):
+        return FileResponse(html_path)
+    return HTMLResponse("<h1>change_password.html Not Found</h1>")
+
+@app.post("/change-password")
+def post_change_password(session_token: str = Cookie(None), new_password: str = Form(...)):
+    """Saves new password and updates default flag."""
+    if not session_token or not verify_session(session_token):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+        
+    set_profile_value("password_hash", hash_password(new_password))
+    set_profile_value("is_default_password", "False")
+    return {"message": "Password changed successfully."}
+
+@app.get("/logout")
+def logout(response: Response):
+    """Destroys current session and redirects to landing page."""
+    destroy_session()
+    response.delete_cookie(key="session_token")
+    return RedirectResponse(url="/", status_code=303)
+
+# Protected Dashboard and APIs
+@app.get("/dashboard")
+def serve_dashboard(session_token: str = Cookie(None)):
+    """Serves the main dashboard HTML if authenticated."""
+    redirect = check_dashboard_auth_redirect(session_token)
+    if redirect:
+        return redirect
+        
     html_path = os.path.join(os.path.dirname(__file__), "index.html")
     if os.path.exists(html_path):
         return FileResponse(html_path)
-    return HTMLResponse("<h1>BMONI Dashboard File index.html Not Found</h1>")
+    return HTMLResponse("<h1>index.html Not Found</h1>")
 
 @app.get("/api/status")
-def get_node_status():
+def get_node_status(session_token: str = Depends(verify_api_auth)):
     """Returns local configuration and live BMONI status."""
     user_id = get_profile_value("bmoni_user_id")
     wallet_address = get_profile_value("smart_wallet_address")
     wallet_id = get_profile_value("smart_wallet_id")
+    
+    first_name = get_profile_value("first_name")
+    last_name = get_profile_value("last_name")
+    email = get_profile_value("email")
+    phone = get_profile_value("phone")
     
     live_balances = []
     vba_details = {}
@@ -137,7 +276,6 @@ def get_node_status():
         try:
             vbas = get_deposit_accounts(user_id)
             if vbas:
-                # Return the first active virtual bank account
                 vba_details = vbas[0]
         except Exception:
             pass
@@ -147,13 +285,17 @@ def get_node_status():
         "bmoni_user_id": user_id,
         "smart_wallet_address": wallet_address,
         "smart_wallet_id": wallet_id,
+        "first_name": first_name,
+        "last_name": last_name,
+        "email": email,
+        "phone": phone,
         "live_balances": live_balances,
         "virtual_bank_account": vba_details
     }
 
 @app.post("/transaction/offline-receive")
 def receive_offline_transaction(tx: TransactionSchema):
-    """Saves offline transaction to SQLite."""
+    """Saves offline transaction to SQLite (unprotected for hardware ingestion)."""
     tx_id = insert_transaction(
         node_id=tx.node_id,
         sender=tx.sender_wallet,
@@ -167,7 +309,7 @@ def receive_offline_transaction(tx: TransactionSchema):
     }
 
 @app.get("/transactions/pending")
-def list_pending_transactions():
+def list_pending_transactions(session_token: str = Depends(verify_api_auth)):
     """Lists pending offline transactions."""
     pending = get_pending_transactions()
     formatted = []
@@ -182,19 +324,16 @@ def list_pending_transactions():
     return {"pending_count": len(formatted), "transactions": formatted}
 
 @app.post("/transactions/sync")
-def sync_transactions():
+def sync_transactions(session_token: str = Depends(verify_api_auth)):
     """Simulates syncing/broadcasting pending offline transactions to BMONI rails."""
     pending = get_pending_transactions()
     if not pending:
         return {"message": "No pending offline transactions to sync."}
         
     synced_ids = []
-    # Simulate processing them one by one through BMONI transfers
     for tx in pending:
         tx_id, node_id, sender, receiver, amount = tx
         print(f"[SYNC] Processing TX {tx_id}: Sending {amount} CNGN from {sender} to {receiver}")
-        # In a real setup, we would call BMONI offramp/swap/transfer endpoint here
-        # For the hackathon sandbox, we simulate the live settlement success
         mark_as_synced(tx_id)
         synced_ids.append(tx_id)
         
@@ -205,7 +344,7 @@ def sync_transactions():
     }
 
 @app.post("/transactions/simulate")
-def simulate_offline_event():
+def simulate_offline_event(session_token: str = Depends(verify_api_auth)):
     """Triggers a simulated ESP32 offline transaction event."""
     payload = {
         "node_id": "C3_MINI_NODE_SIMULATED",
@@ -230,7 +369,7 @@ def random_amount():
     return round(random.uniform(500, 5000), 2)
 
 @app.post("/ai/chat")
-def chat_with_agent(chat_msg: ChatMessageSchema):
+def chat_with_agent(chat_msg: ChatMessageSchema, session_token: str = Depends(verify_api_auth)):
     """Sends user query to Gemini AI financial assistant."""
     user_id = get_profile_value("bmoni_user_id")
     response_text = get_ai_response(chat_msg.message, bmoni_user_id=user_id)

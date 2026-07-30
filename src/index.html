@@ -305,7 +305,10 @@
             <h1>⚡ BMONI Agent Relay Node</h1>
             <p style="color: var(--text-muted); margin-top: 0.2rem;">Offline Escrow Escort & Blockchain Syncer</p>
         </div>
-        <div class="status-badge" id="node-status-text">Relay Node Online</div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div class="status-badge" id="node-status-text">Relay Node Online</div>
+            <button class="btn-secondary" style="padding: 0.4rem 1rem; font-size: 0.9rem;" onclick="location.href='/logout'">Logout</button>
+        </div>
     </header>
 
     <div class="grid">
@@ -314,6 +317,14 @@
             <!-- Wallet Details Card -->
             <div class="card">
                 <div class="card-title">Live BMONI Smart Account <span>Sandbox</span></div>
+                <div class="info-row">
+                    <span class="info-label">Agent Name</span>
+                    <span class="info-value" id="agent-name" style="color: var(--primary);">Loading...</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Email / Phone</span>
+                    <span class="info-value" id="agent-contact" style="font-size: 0.9rem;">Loading...</span>
+                </div>
                 <div class="info-row">
                     <span class="info-label">Live CNGN Balance</span>
                     <span class="info-value highlight-value" id="cngn-balance">0.00 CNGN</span>
@@ -388,6 +399,8 @@
                 
                 document.getElementById("wallet-address").textContent = data.smart_wallet_address || "Onboarding Wallet...";
                 document.getElementById("user-id").textContent = data.bmoni_user_id || "Creating user...";
+                document.getElementById("agent-name").textContent = `${data.first_name || ""} ${data.last_name || ""}`;
+                document.getElementById("agent-contact").textContent = `${data.email || ""} / ${data.phone || ""}`;
                 
                 // Display balances
                 if (data.live_balances && data.live_balances.length > 0) {
