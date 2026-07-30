@@ -1,11 +1,14 @@
 import sqlite3
+import os
 
 DB_NAME = "offline_relay.db"
 
 def init_db():
-    """Creates the local escrow database table if it doesn't exist."""
+    """Creates the local escrow database table and settings table if they don't exist."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+    
+    # Existing transactions table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS transactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -17,6 +20,15 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    
+    # Key-value store for agent profile / BMONI credentials
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS agent_profile (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    ''')
+    
     conn.commit()
     conn.close()
     print("Local Escrow SQLite DB Initialized successfully.")
@@ -48,6 +60,26 @@ def mark_as_synced(tx_id):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("UPDATE transactions SET status = 'SYNCED_TO_BMONI' WHERE id = ?", (tx_id,))
+    conn.commit()
+    conn.close()
+
+def get_profile_value(key):
+    """Retrieves a configuration value from the database."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM agent_profile WHERE key = ?", (key,))
+    row = cursor.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+def set_profile_value(key, value):
+    """Saves/updates a configuration value in the database."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT OR REPLACE INTO agent_profile (key, value)
+        VALUES (?, ?)
+    ''', (key, str(value)))
     conn.commit()
     conn.close()
 
